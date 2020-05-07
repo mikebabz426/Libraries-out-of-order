@@ -1,0 +1,100 @@
+<script src="../simpletest.js"></script>
+<script>
+  (function () {
+    //Stores all libraries
+    var libraryStorage = {};
+    //Stores callbacks for libraries with dependencies to execute later when library is called
+    var callbackStorage = {};
+
+    function librarySystem(libName, dependencyArray, callback) {
+      //Creating a library
+      if (arguments.length > 1) {
+        //Check if there are dependencies
+        if (dependencyArray.length === 0) {
+          //No dependencies, in which case executes callback directly
+          libraryStorage[libName] = callback();
+        } else {
+          //Takes dependencies and callback and stores them for use when library is called
+          libraryStorage[libName] = dependencyArray;
+          callbackStorage[libName] = callback;
+        }
+      } else {
+        //Returning a library
+
+        //Checks if library is array (the dependencies are stored temporarily in the libraryStorage as an array)
+        if (Array.isArray(libraryStorage[libName])) {
+          var library = libraryStorage[libName];
+          var argumentStorage = [];
+          //Takes the dependencies from libraryStorage and moves them to argumentStorage
+          for (var i = 0; i < library.length; i++) {
+            argumentStorage[i] = libraryStorage[library[i]];
+          }
+          //Executes callback and passes in dependencies as arguments through apply()
+          libraryStorage[libName] = callbackStorage[libName].apply(
+            this,
+            argumentStorage
+          );
+          return libraryStorage[libName];
+        } else {
+          //No dependencies - therefore library is returned directly from libraryStorage object
+          return libraryStorage[libName];
+        }
+      }
+    }
+    //Gives users access to the library from the window object
+    window.librarySystem = librarySystem;
+  })();
+
+  tests({
+    "It should work the same as before": function () {
+      librarySystem("name", [], function () {
+        return "Gordon";
+      });
+      librarySystem("company", [], function () {
+        return "Watch and Code";
+      });
+      librarySystem("workBlurb", ["name", "company"], function (name, company) {
+        return name + " works at " + company;
+      });
+      var result = librarySystem("workBlurb");
+      seq(result, "Gordon works at Watch and Code");
+    },
+    "It should work with libraries created out of order": function () {
+      librarySystem("employment", ["person", "employer"], function (
+        person,
+        employer
+      ) {
+        return person + " works at " + employer;
+      });
+
+      librarySystem("person", [], function () {
+        return "Mike";
+      });
+
+      librarySystem("employer", [], function () {
+        return "Google";
+      });
+
+      var result = librarySystem("employment"); // 'Gordon works at Watch and Code'
+      seq(result, "Mike works at Google");
+    },
+    "It should run the callback once": function () {
+      var counter = 0;
+      librarySystem("workBlurb", ["name", "company"], function (name, company) {
+        counter++;
+        return name + " works at " + company;
+      });
+      librarySystem("name", [], function () {
+        return "Gordon";
+      });
+      librarySystem("company", [], function () {
+        return "Watch and Code";
+      });
+      librarySystem("workBlurb");
+      librarySystem("workBlurb");
+      librarySystem("workBlurb");
+      librarySystem("workBlurb");
+      seq(counter, 1);
+    },
+  });
+</script>
